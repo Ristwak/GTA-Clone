@@ -1,5 +1,3 @@
-using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
 
 public class CarNavigatorScript : MonoBehaviour
@@ -9,14 +7,9 @@ public class CarNavigatorScript : MonoBehaviour
     public float turningSpeed = 300f;
     public float stopSpeed = 1f;
     public Transform[] wheels;
-
     [Header("Destination Variable")]
     public Vector3 destination;
     public bool destinationReached;
-
-    void Start()
-    {
-    }
 
     void Update()
     {
@@ -25,32 +18,25 @@ public class CarNavigatorScript : MonoBehaviour
 
     public void Walk()
     {
-        if (transform.position != destination)
+        Vector3 destinationDir = destination - transform.position;
+        destinationDir.y = 0f;
+        float destinationDistance = destinationDir.magnitude;
+        if (destinationDistance >= stopSpeed)
         {
-            Vector3 destinationDir = destination - transform.position;
-            destinationDir.y = 0;
-            float destinationDistance = destinationDir.magnitude;
-
-            if (destinationDistance >= stopSpeed)
+            destinationReached = false;
+            Quaternion targetRotation = Quaternion.LookRotation(destinationDir);
+            float angleToDestination = Quaternion.Angle(transform.rotation, targetRotation);
+            if (angleToDestination > 1f)
             {
-                destinationReached = false;
-                Quaternion targetRotation = Quaternion.LookRotation(destinationDir);
-                
-                // Only rotate if the angle is significant
-                float angleToDestination = Quaternion.Angle(transform.rotation, targetRotation);
-                if (angleToDestination > 1f)
-                {
-                    float adjustedTurningSpeed = turningSpeed * Mathf.Clamp01(destinationDistance / 10f);
-                    transform.rotation = Quaternion.RotateTowards(transform.rotation, targetRotation, adjustedTurningSpeed * Time.deltaTime);
-                }
-
-                transform.Translate(Vector3.forward * movingSpeed * Time.deltaTime);
-                RotateWheels();
+                float adjustedTurningSpeed = turningSpeed * Mathf.Clamp01(destinationDistance / 10f);
+                transform.rotation = Quaternion.RotateTowards(transform.rotation, targetRotation, adjustedTurningSpeed * Time.deltaTime);
             }
-            else
-            {
-                destinationReached = true;
-            }
+            transform.Translate(Vector3.forward * movingSpeed * Time.deltaTime);
+            RotateWheels();
+        }
+        else
+        {
+            destinationReached = true;
         }
     }
 
@@ -62,9 +48,12 @@ public class CarNavigatorScript : MonoBehaviour
 
     void RotateWheels()
     {
-        foreach(Transform wheel in wheels)
+        if (wheels == null)
+            return;
+        foreach (Transform wheel in wheels)
         {
-            wheel.Rotate(Vector3.right, movingSpeed * Time.deltaTime * 200f);
+            if (wheel != null)
+                wheel.Rotate(Vector3.right, movingSpeed * Time.deltaTime * 200f);
         }
     }
 }

@@ -1,5 +1,3 @@
-using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
 
 public class CarWaypointNavigator : MonoBehaviour
@@ -16,20 +14,29 @@ public class CarWaypointNavigator : MonoBehaviour
 
     void Start()
     {
-        direction = Mathf.RoundToInt(Random.Range(0f, 1f));
-        car.LocateDestination(currentWaypoint.GetPosition());
+        direction = Random.Range(0, 2);
+        if (car != null && currentWaypoint != null)
+            car.LocateDestination(currentWaypoint.GetPosition());
     }
 
     void Update()
     {
-        if (car.destinationReached)
-        {
-            if (currentWaypoint.nextWaypoint != null)
-            {
-                currentWaypoint = currentWaypoint.previousWaypoint;
-            }
+        if (car == null || currentWaypoint == null || !car.destinationReached)
+            return;
+        MoveToNextWaypoint();
+    }
 
-            car.LocateDestination(currentWaypoint.GetPosition());
+    void MoveToNextWaypoint()
+    {
+        WayPoint nextWaypoint = direction == 0 ? currentWaypoint.nextWaypoint : currentWaypoint.previousWaypoint;
+        if (nextWaypoint == null)
+        {
+            direction = 1 - direction;
+            nextWaypoint = direction == 0 ? currentWaypoint.nextWaypoint : currentWaypoint.previousWaypoint;
         }
+        if (nextWaypoint == null)
+            return;
+        currentWaypoint = nextWaypoint;
+        car.LocateDestination(currentWaypoint.GetPosition());
     }
 }

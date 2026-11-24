@@ -1,5 +1,3 @@
-using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
 
 public class PlayerMovement : MonoBehaviour
@@ -42,6 +40,8 @@ public class PlayerMovement : MonoBehaviour
     public float jumpHeight = 4f;
     public float gravityIntensity = -15f;
 
+    bool isDead;
+
     void Awake()
     {
         healthBar = FindObjectOfType<HealthBar>();
@@ -49,100 +49,137 @@ public class PlayerMovement : MonoBehaviour
         playerRigidBody = GetComponent<Rigidbody>();
         playerManager = GetComponent<PlayerManager>();
         animatorManager = GetComponent<AnimatorManager>();
+
         presentHealth = characterHealth;
-        healthBar.GiveFullHealth(presentHealth);
+
+        if (healthBar != null)
+            healthBar.GiveFullHealth(presentHealth);
     }
 
     public void HandleAllMovement()
     {
-        HandleFallingandLanding();
-        if (playerManager.isInteracting)
+        if (isDead || playerRigidBody == null)
             return;
-        
+
+        HandleFallingandLanding();
+
+        if (playerManager != null && playerManager.isInteracting)
+            return;
+
         HandleMovement();
         HandleRotation();
     }
 
     void HandleMovement()
     {
-        if (isJumping)
+        if (isJumping || inputManager == null || camObject == null)
             return;
+
         moveDirection = camObject.forward * inputManager.verticalInput;
         moveDirection += camObject.right * inputManager.horizontalInput;
+
         moveDirection.Normalize();
-        moveDirection.y = 0;
+        moveDirection.y = 0f;
+
         if (isSprinting)
         {
-            moveDirection = moveDirection * sprintingSpeed;
+            moveDirection *= sprintingSpeed;
+        }
+        else if (inputManager.moveAmount >= 0.5f)
+        {
+            moveDirection *= runningSpeed;
+            isMoving = true;
         }
         else
         {
-            if (inputManager.moveAmount >= 0.5f)
-            {
-                moveDirection = moveDirection * runningSpeed;
-                isMoving = true;
-            }
-            else if (inputManager.moveAmount < 0.5f)
-            {
-                moveDirection = moveDirection * walkingSpeed;
-                isMoving = false;
-            }
+            moveDirection *= walkingSpeed;
+            isMoving = false;
         }
 
-        Vector3 movementVelocity = moveDirection;
+        // Preserve vertical velocity so movement does not overwrite jumping/falling.
+        Vector3 movementVelocity = playerRigidBody.velocity;
+        movementVelocity.x = moveDirection.x;
+        movementVelocity.z = moveDirection.z;
+
         playerRigidBody.velocity = movementVelocity;
     }
 
     void HandleRotation()
     {
-        if (isJumping)
+        if (isJumping || inputManager == null || camObject == null)
             return;
-        Vector3 targetDirection = Vector3.zero;
 
-        targetDirection = camObject.forward * inputManager.verticalInput;
-        targetDirection = targetDirection + camObject.right * inputManager.horizontalInput;
+        Vector3 targetDirection =
+            camObject.forward * inputManager.verticalInput;
+
+        targetDirection += camObject.right * inputManager.horizontalInput;
         targetDirection.Normalize();
-        targetDirection.y = 0;
+        targetDirection.y = 0f;
 
-        if (targetDirection == Vector3.zero)
-        {
-            targetDirection = transform.forward;
-        }
+        if (targetDirection.sqrMagnitude < 0.0001f)
+            return;
 
         Quaternion targetRotation = Quaternion.LookRotation(targetDirection);
-        Quaternion playerRotation = Quaternion.Slerp(transform.rotation, targetRotation, rotationSpeed * Time.deltaTime);
 
-        transform.rotation = playerRotation;
+        transform.rotation = Quaternion.Slerp(
+            transform.rotation,
+            targetRotation,
+            rotationSpeed * Time.deltaTime
+        );
     }
 
     void HandleFallingandLanding()
     {
-        RaycastHit hit;
+        if (playerRigidBody == null)
+            return;
+
         Vector3 rayCastOrigin = transform.position;
-        Vector3 targetPosition;
         rayCastOrigin.y += rayCastHeightOffset;
-        targetPosition = transform.position;
+
+        Vector3 targetPosition = transform.position;
 
         if (!isGrounded && !isJumping)
         {
-            if (!playerManager.isInteracting)
+            if (playerManager == null || !playerManager.isInteracting)
             {
-                animatorManager.PlayTargetAnim("Falling", true);
+                if (animatorManager != null)
+                    animatorManager.PlayTargetAnim("Falling", true);
             }
+
             inAirTimer += Time.deltaTime;
-            playerRigidBody.AddForce(transform.forward * leapingVelocity);
-            playerRigidBody.AddForce(-Vector3.up * fallingVelocity * inAirTimer);
+
+            playerRigidBody.AddForce(
+                transform.forward * leapingVelocity
+            );
+
+            playerRigidBody.AddForce(
+                -Vector3.up * fallingVelocity * inAirTimer
+            );
         }
 
-        if (Physics.SphereCast(rayCastOrigin, 0.3f, -Vector3.up, out hit, groundLayer))
+        RaycastHit hit;
+
+        // Correct SphereCast overload: max distance and LayerMask are separate.
+        float groundCheckDistance = rayCastHeightOffset + 0.3f;
+
+        if (Physics.SphereCast(
+            rayCastOrigin,
+            0.3f,
+            Vector3.down,
+            out hit,
+            groundCheckDistance,
+            groundLayer,
+            QueryTriggerInteraction.Ignore))
         {
-            if (!isGrounded && !playerManager.isInteracting)
+            if (!isGrounded &&
+                (playerManager == null || !playerManager.isInteracting))
             {
-                animatorManager.PlayTargetAnim("Landing", true);
+                if (animatorManager != null)
+                    animatorManager.PlayTargetAnim("Landing", true);
             }
-            Vector3 rayCastHitPoint = hit.point;
-            targetPosition.y = rayCastHitPoint.y;
-            inAirTimer = 0;
+
+            targetPosition.y = hit.point.y;
+            inAirTimer = 0f;
             isGrounded = true;
         }
         else
@@ -152,9 +189,15 @@ public class PlayerMovement : MonoBehaviour
 
         if (isGrounded && !isJumping)
         {
-            if (playerManager.isInteracting || inputManager.moveAmount > 0)
+            if (playerManager != null &&
+                playerManager.isInteracting ||
+                inputManager != null && inputManager.moveAmount > 0)
             {
-                transform.position = Vector3.Lerp(transform.position, targetPosition, Time.deltaTime / 0.1f);
+                transform.position = Vector3.Lerp(
+                    transform.position,
+                    targetPosition,
+                    Time.deltaTime / 0.1f
+                );
             }
             else
             {
@@ -165,39 +208,59 @@ public class PlayerMovement : MonoBehaviour
 
     public void HandleJumping()
     {
-        if (isGrounded)
-        {
-            animatorManager.animator.SetBool("isJumping", true);
-            animatorManager.PlayTargetAnim("Jump", false);
+        if (!isGrounded || isDead ||
+            playerRigidBody == null || animatorManager == null)
+            return;
 
-            float jumingVelocity = Mathf.Sqrt(-2 * gravityIntensity * jumpHeight);
-            Vector3 playerVelocity = moveDirection;
-            playerVelocity.y = jumingVelocity;
-            playerRigidBody.velocity = playerVelocity;
+        animatorManager.animator.SetBool("isJumping", true);
+        animatorManager.PlayTargetAnim("Jump", false);
 
-            isJumping = false;
-        }
+        float jumpingVelocity = Mathf.Sqrt(
+            -2f * gravityIntensity * jumpHeight
+        );
+
+        Vector3 playerVelocity = playerRigidBody.velocity;
+        playerVelocity.x = moveDirection.x;
+        playerVelocity.z = moveDirection.z;
+        playerVelocity.y = jumpingVelocity;
+
+        playerRigidBody.velocity = playerVelocity;
+
+        isJumping = false;
     }
 
-    public void SetIsJumping(bool isJumping)
+    public void SetIsJumping(bool jumping)
     {
-        this.isJumping = isJumping;
+        isJumping = jumping;
     }
 
     public void CharacterHitDamage(float takeDamage)
     {
-        presentHealth -= takeDamage;
-        healthBar.SetHealth(presentHealth);
+        if (isDead || takeDamage <= 0f)
+            return;
 
-        if (presentHealth <= 0)
-        {
-            // kill character
+        presentHealth = Mathf.Max(0f, presentHealth - takeDamage);
+
+        if (healthBar != null)
+            healthBar.SetHealth(presentHealth);
+
+        if (presentHealth <= 0f)
             CharacterDie();
-        }
     }
 
     void CharacterDie()
     {
-        Object.Destroy(gameObject);
+        if (isDead)
+            return;
+
+        isDead = true;
+
+        if (playerRigidBody != null)
+        {
+            playerRigidBody.velocity = Vector3.zero;
+            playerRigidBody.isKinematic = true;
+        }
+
+        Destroy(gameObject);
     }
 }

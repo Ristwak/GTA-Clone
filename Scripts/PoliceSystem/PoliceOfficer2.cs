@@ -1,5 +1,3 @@
-using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
 
 public class PoliceOfficer2 : MonoBehaviour
@@ -11,16 +9,13 @@ public class PoliceOfficer2 : MonoBehaviour
     public float turningSpeed = 300f;
     public float stopSpeed = 1f;
     bool isDead = false;
-
     [Header("Character Health")]
     float characterHealth = 100f;
     public float presentHealth;
-
     [Header("Destination Var")]
     public Vector3 destination;
     public bool destinationReached;
     Animator animator;
-
     [Header("Police AI")]
     GameObject playerBody;
     public LayerMask playerLayer;
@@ -28,7 +23,6 @@ public class PoliceOfficer2 : MonoBehaviour
     public float shootingRadius;
     public bool playerInVisionRadius;
     public bool playerInShootingRadius;
-
     [Header("Police Shooting Variables")]
     public float giveDamageOf = 3f;
     public float shootingRange = 100f;
@@ -36,7 +30,6 @@ public class PoliceOfficer2 : MonoBehaviour
     public float timeBtwShoot;
     bool previouslyShoot;
     public GameObject bloodEffect;
-
     [Header("Script Refs")]
     WantedLevel wantedLevelScript;
     GameManager gameManager;
@@ -53,25 +46,33 @@ public class PoliceOfficer2 : MonoBehaviour
 
     void Update()
     {
-        if (isDead == true)
+        if (isDead)
             return;
-        
+        if (playerBody == null)
+            playerBody = GameObject.Find("Player");
+        if (wantedLevelScript == null)
+            wantedLevelScript = FindObjectOfType<WantedLevel>();
+        if (playerBody == null || wantedLevelScript == null)
+            return;
         playerInVisionRadius = Physics.CheckSphere(transform.position, visionRadius, playerLayer);
         playerInShootingRadius = Physics.CheckSphere(transform.position, shootingRadius, playerLayer);
-
-        if (wantedLevelScript.Level1 == false && wantedLevelScript.Level2 == false && wantedLevelScript.Level3 == false && wantedLevelScript.Level4 == false && wantedLevelScript.Level5 == false)
+        bool isWanted = wantedLevelScript.Level4 || wantedLevelScript.Level5;
+        if (!isWanted)
         {
             Walk();
+            return;
         }
-
-        if (playerInVisionRadius && !playerInShootingRadius && wantedLevelScript.Level4 == true || wantedLevelScript.Level5 == true)
+        if (playerInVisionRadius && playerInShootingRadius)
+        {
+            ShootPlayer();
+        }
+        else if (playerInVisionRadius)
         {
             ChasePlayer();
         }
-
-        if (playerInVisionRadius && playerInShootingRadius && wantedLevelScript.Level4 == true || wantedLevelScript.Level5 == true)
+        else
         {
-            ShootPlayer();
+            Walk();
         }
     }
 
@@ -82,23 +83,27 @@ public class PoliceOfficer2 : MonoBehaviour
             Vector3 destinationDir = destination - transform.position;
             destinationDir.y = 0;
             float destinationDistance = destinationDir.magnitude;
-
             if (destinationDistance >= stopSpeed)
             {
                 destinationReached = false;
                 Quaternion targetRotation = Quaternion.LookRotation(destinationDir);
                 transform.rotation = Quaternion.RotateTowards(transform.rotation, targetRotation, turningSpeed * Time.deltaTime);
-
                 transform.Translate(Vector3.forward * movingSpeed * Time.deltaTime);
-
-                animator.SetBool("Walk", true);
-                animator.SetBool("Shoot", false);
-                animator.SetBool("Run", false);
+                if (animator != null)
+                {
+                    animator.SetBool("Walk", true);
+                    animator.SetBool("Shoot", false);
+                    animator.SetBool("Run", false);
+                }
             }
             else
             {
                 destinationReached = true;
             }
+        }
+        else
+        {
+            destinationReached = true;
         }
     }
 
@@ -110,45 +115,50 @@ public class PoliceOfficer2 : MonoBehaviour
 
     public void ChasePlayer()
     {
-        transform.position += transform.forward * currentMovingSpeed * Time.deltaTime;
-        transform.LookAt(playerBody.transform);
-
-        animator.SetBool("Run", true);
-        animator.SetBool("Walk", false);
-        animator.SetBool("Shooting", false);
-
+        if (playerBody == null)
+            return;
         currentMovingSpeed = runningSpeed;
+        transform.LookAt(playerBody.transform);
+        transform.position += transform.forward * currentMovingSpeed * Time.deltaTime;
+        if (animator != null)
+        {
+            animator.SetBool("Run", true);
+            animator.SetBool("Walk", false);
+            animator.SetBool("Shooting", false);
+        }
     }
 
     void ShootPlayer()
     {
+        if (playerBody == null)
+            return;
         currentMovingSpeed = 0f;
         transform.LookAt(playerBody.transform);
-
-        animator.SetBool("Walk", false);
-        animator.SetBool("Run", false);
-        animator.SetBool("Shoot", true);
-
-        if (!previouslyShoot)
+        if (animator != null)
         {
-            RaycastHit hit;
-            if (Physics.Raycast(shootingRaycastArea.transform.position, shootingRaycastArea.transform.forward, out hit, shootingRange))
+            animator.SetBool("Walk", false);
+            animator.SetBool("Run", false);
+            animator.SetBool("Shoot", true);
+        }
+        if (previouslyShoot || shootingRaycastArea == null)
+            return;
+        RaycastHit hit;
+        if (Physics.Raycast(shootingRaycastArea.transform.position, shootingRaycastArea.transform.forward, out hit, shootingRange))
+        {
+            Debug.Log("Police is shooting at " + hit.transform.name);
+            PlayerMovement playerScript = hit.transform.GetComponentInParent<PlayerMovement>();
+            if (playerScript != null)
             {
-                Debug.Log("Police is shooting at " + hit.transform.name);
-
-                PlayerMovement playerScript = hit.transform.GetComponent<PlayerMovement>();
-
-                if (playerScript != null)
+                playerScript.CharacterHitDamage(giveDamageOf);
+                if (bloodEffect != null)
                 {
-                    playerScript.CharacterHitDamage(giveDamageOf);
                     GameObject bloodEffectGo = Instantiate(bloodEffect, hit.point, Quaternion.LookRotation(hit.normal));
                     Destroy(bloodEffectGo, 1f);
                 }
             }
-
-            previouslyShoot = true;
-            Invoke(nameof(ActiveShooting), timeBtwShoot);
         }
+        previouslyShoot = true;
+        Invoke(nameof(ActiveShooting), timeBtwShoot);
     }
 
     void ActiveShooting()
@@ -158,25 +168,34 @@ public class PoliceOfficer2 : MonoBehaviour
 
     public void CharacterHitDamage(float takeDamage)
     {
-        presentHealth -= takeDamage;
-
-        if (presentHealth <= 0)
+        if (isDead || takeDamage <= 0f)
+            return;
+        presentHealth = Mathf.Max(0f, presentHealth - takeDamage);
+        if (presentHealth <= 0f)
         {
-            animator.SetBool("Die", true);
-            // kill character
+            if (animator != null)
+                animator.SetBool("Die", true);
             CharacterDie();
-            // increase player kills and player money
-            gameManager.currentKills += 1;
-            gameManager.playerMoney += 50;
+            if (gameManager != null)
+            {
+                gameManager.currentKills += 1;
+                gameManager.playerMoney += 50;
+            }
         }
     }
 
     void CharacterDie()
     {
+        if (isDead)
+            return;
         isDead = true;
         shootingRadius = 0f;
         movingSpeed = 0f;
-        gameObject.GetComponent<CapsuleCollider>().enabled = false;
-        Object.Destroy(gameObject, 4f);
+        currentMovingSpeed = 0f;
+        CapsuleCollider policeCollider = GetComponent<CapsuleCollider>();
+        if (policeCollider != null)
+            policeCollider.enabled = false;
+        CancelInvoke(nameof(ActiveShooting));
+        Destroy(gameObject, 4f);
     }
 }

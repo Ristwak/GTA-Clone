@@ -1,7 +1,6 @@
-using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
 using UnityStandardAssets.CrossPlatformInput;
+
 public class InputManager : MonoBehaviour
 {
     PlayerControls playerControls;
@@ -9,7 +8,6 @@ public class InputManager : MonoBehaviour
     PlayerMovement playerMovement;
     CameraPositionManager cameraPositionManager;
     GameManager gameManager;
-
     public float moveAmount;
     private Vector2 movementInput;
     public float verticalInput;
@@ -43,17 +41,29 @@ public class InputManager : MonoBehaviour
         cameraPositionManager = FindObjectOfType<CameraPositionManager>();
         gameManager = FindObjectOfType<GameManager>();
     }
+
     void OnEnable()
     {
         if (playerControls == null)
         {
             playerControls = new PlayerControls();
             playerControls.PlayerMovement.Movement.performed += i => movementInput = i.ReadValue<Vector2>();
+            playerControls.PlayerMovement.Movement.canceled += i => movementInput = Vector2.zero;
             playerControls.PlayerMovement.CameraMovement.performed += i => cameraInput = i.ReadValue<Vector2>();
+            playerControls.PlayerMovement.CameraMovement.canceled += i => cameraInput = Vector2.zero;
             playerControls.PlayerActions.B.performed += i => bInput = true;
             playerControls.PlayerActions.B.canceled += i => bInput = false;
             playerControls.PlayerActions.Jump.performed += i => jumpInput = true;
-            playerControls.PlayerActions.Interact.performed += i => interactInput = true;
+            playerControls.PlayerActions.Interact.performed += i =>
+            {
+                interactInput = true;
+                carInteractInput = true;
+            };
+            playerControls.PlayerActions.Interact.canceled += i =>
+            {
+                interactInput = false;
+                carInteractInput = false;
+            };
             playerControls.PlayerActions.Previous.performed += i => previousInput = true;
             playerControls.PlayerActions.Next.performed += i => nextInput = true;
             playerControls.PlayerActions.Buy.performed += i => buyInput = true;
@@ -64,17 +74,29 @@ public class InputManager : MonoBehaviour
             playerControls.PlayerActions.Scope.canceled += i => aimInput = false;
             playerControls.PlayerActions.Reload.performed += i => reloadInput = true;
             playerControls.PlayerActions.Reload.canceled += i => reloadInput = false;
-            playerControls.PlayerActions.Interact.performed += i => carInteractInput = true;
-            playerControls.PlayerActions.Interact.canceled += i => carInteractInput = false;
             playerControls.PlayerActions.Pause.performed += i => pauseInput = true;
         }
-
         playerControls.Enable();
     }
 
     void OnDisable()
     {
-        playerControls.Disable();
+        if (playerControls != null)
+            playerControls.Disable();
+        movementInput = Vector2.zero;
+        cameraInput = Vector2.zero;
+        bInput = false;
+        jumpInput = false;
+        interactInput = false;
+        previousInput = false;
+        nextInput = false;
+        buyInput = false;
+        changeInput = false;
+        shootInput = false;
+        aimInput = false;
+        reloadInput = false;
+        carInteractInput = false;
+        pauseInput = false;
     }
 
     public void HandleAllInputs()
@@ -82,126 +104,83 @@ public class InputManager : MonoBehaviour
         HandleMovementInput();
         HandleSprintingInput();
         HandleJumpingInput();
-        HandleInteractInput();
         HandleNextInput();
         HandlePreviousInput();
         HandleBuyInput();
-        HandleRifleChangeInput();
-        HandlePauseInput();
     }
 
     void HandleMovementInput()
     {
+        if (gameManager == null || playerMovement == null)
+            return;
         if (gameManager.useMobileInputs)
         {
-            verticalInput = movementJoyStick.Vertical;
-            horizontalInput = movementJoyStick.Horizontal;
-
-            cameraInputX = cameraJoyStick.Horizontal;
-            cameraInputY = cameraJoyStick.Vertical;
-
-            moveAmount = Mathf.Clamp01(Mathf.Abs(horizontalInput) + Mathf.Abs(verticalInput));
-            animatorManager.UpdateAnimValues(0, moveAmount, playerMovement.isSprinting);
+            verticalInput = movementJoyStick != null ? movementJoyStick.Vertical : 0f;
+            horizontalInput = movementJoyStick != null ? movementJoyStick.Horizontal : 0f;
+            cameraInputX = cameraJoyStick != null ? cameraJoyStick.Horizontal : 0f;
+            cameraInputY = cameraJoyStick != null ? cameraJoyStick.Vertical : 0f;
         }
         else
         {
             verticalInput = movementInput.y;
             horizontalInput = movementInput.x;
-
             cameraInputX = cameraInput.x;
             cameraInputY = cameraInput.y;
-
-            moveAmount = Mathf.Clamp01(Mathf.Abs(horizontalInput) + Mathf.Abs(verticalInput));
-            animatorManager.UpdateAnimValues(0, moveAmount, playerMovement.isSprinting);
         }
+        moveAmount = Mathf.Clamp01(Mathf.Abs(horizontalInput) + Mathf.Abs(verticalInput));
+        if (animatorManager != null)
+            animatorManager.UpdateAnimValues(0f, moveAmount, playerMovement.isSprinting);
     }
 
     void HandleSprintingInput()
     {
-        if (gameManager.useMobileInputs && CrossPlatformInputManager.GetButton("Sprint"))
-        {
-            playerMovement.isSprinting = true;
-        }
-
-        if (bInput && moveAmount > 0.5f)
-        {
-            playerMovement.isSprinting = true;
-        }
-        else
-        {
-            playerMovement.isSprinting = false;
-        }
+        if (gameManager == null || playerMovement == null)
+            return;
+        bool mobileSprint = gameManager.useMobileInputs && CrossPlatformInputManager.GetButton("Sprint");
+        bool keyboardSprint = !gameManager.useMobileInputs && bInput;
+        playerMovement.isSprinting = (mobileSprint || keyboardSprint) && moveAmount > 0.5f;
     }
 
     void HandleJumpingInput()
     {
-        if (gameManager.useMobileInputs && CrossPlatformInputManager.GetButton("Jump"))
-        {
-            jumpInput = false;
-            playerMovement.isJumping = true;
-            playerMovement.HandleJumping();
-        }
-
-        if (jumpInput)
-        {
-            jumpInput = false;
-            playerMovement.isJumping = true;
-            playerMovement.HandleJumping();
-        }
-    }
-
-    void HandleInteractInput()
-    {
-        if (jumpInput)
-        {
-            interactInput = false;
-        }
+        if (gameManager == null || playerMovement == null)
+            return;
+        bool jumpPressed = gameManager.useMobileInputs
+            ? CrossPlatformInputManager.GetButtonDown("Jump")
+            : jumpInput;
+        if (!jumpPressed)
+            return;
+        jumpInput = false;
+        playerMovement.isJumping = true;
+        playerMovement.HandleJumping();
     }
 
     void HandleNextInput()
     {
-        if (nextInput)
-        {
+        if (!nextInput)
+            return;
+        if (cameraPositionManager != null)
             cameraPositionManager.NextPosition();
-            nextInput = false;
-        }
+        nextInput = false;
     }
 
     void HandlePreviousInput()
     {
-        if (previousInput)
-        {
+        if (!previousInput)
+            return;
+        if (cameraPositionManager != null)
             cameraPositionManager.PreviousPosition();
-            previousInput = false;
-        }
+        previousInput = false;
     }
 
     void HandleBuyInput()
     {
-        if (buyInput)
-        {
+        if (!buyInput)
+            return;
+        if (cameraPositionManager != null)
             cameraPositionManager.BuyItem();
-            if (gameManager.Mission1 == true && gameManager.Mission2 == false && gameManager.Mission3 == false && gameManager.Mission4 == false && gameManager.Mission5 == false)
-            {
-                gameManager.Mission2 = true;
-            }
-            buyInput = false;
-        }
-    }
-
-    void HandleRifleChangeInput()
-    {
-        if (changeInput)
-        {
-            changeInput = false;
-        }
-    }
-
-    void HandlePauseInput()
-    {
-        if (pauseInput)
-        {
-            pauseInput = false;
-        }
+        if (gameManager != null && gameManager.Mission1 && !gameManager.Mission2 && !gameManager.Mission3 && !gameManager.Mission4 && !gameManager.Mission5)
+            gameManager.Mission2 = true;
+        buyInput = false;
     }
 }

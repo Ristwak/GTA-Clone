@@ -1,5 +1,3 @@
-using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
 using UnityStandardAssets.CrossPlatformInput;
 
@@ -11,17 +9,12 @@ public class CarInteraction : MonoBehaviour
     public GameObject car1;
     public GameObject car2;
     public GameObject car3;
-
     Transform exitPosition;
-
     GameObject currentCar;
     public GameObject playerCamera;
-
     public bool playerInCar;
     public int carSeatRange = 3;
-
     public KeyCode carIntercatKey = KeyCode.E;
-
 
     void Start()
     {
@@ -31,81 +24,83 @@ public class CarInteraction : MonoBehaviour
 
     void Update()
     {
-        if (playerInCar == true)
+        if (playerInCar)
         {
-            playerCamera.transform.position = exitPosition.transform.position;
-            player.transform.position = exitPosition.transform.position;
-            inputManager.jumpInput = false;
-        }
-
-        if (gameManager.useMobileInputs)
-        {
-            if (CrossPlatformInputManager.GetButton("EKey"))
+            if (exitPosition != null && player != null && playerCamera != null)
             {
-                if (currentCar == null)
-                {
-                    TryEnterCar(car1);
-                    TryEnterCar(car2);
-                    TryEnterCar(car3);
-                }
-                else
-                {
-                    ExitCar();
-                }
+                playerCamera.transform.position = exitPosition.position;
+                player.transform.position = exitPosition.position;
             }
+            if (inputManager != null)
+                inputManager.jumpInput = false;
+        }
+        if (gameManager == null)
+            return;
+        bool interactPressed = gameManager.useMobileInputs
+            ? CrossPlatformInputManager.GetButtonDown("EKey")
+            : Input.GetKeyDown(carIntercatKey);
+        if (!interactPressed)
+            return;
+        if (currentCar == null)
+        {
+            TryEnterCar(car1);
+            if (currentCar == null)
+                TryEnterCar(car2);
+            if (currentCar == null)
+                TryEnterCar(car3);
         }
         else
         {
-            if (Input.GetKeyDown(carIntercatKey))
-            {
-                if (currentCar == null)
-                {
-                    TryEnterCar(car1);
-                    TryEnterCar(car2);
-                    TryEnterCar(car3);
-                }
-                else
-                {
-                    ExitCar();
-                }
-            }
+            ExitCar();
         }
-
     }
 
     void TryEnterCar(GameObject car)
     {
-        if (car != null && Vector3.Distance(player.transform.position, car.transform.position) < carSeatRange)
+        if (car == null || player == null || playerCamera == null)
+            return;
+        if (Vector3.Distance(player.transform.position, car.transform.position) >= carSeatRange)
+            return;
+        PrometeoCarController carController = car.GetComponent<PrometeoCarController>();
+        Transform carExit = car.transform.Find("CarExitPoint");
+        Transform carCamera = car.transform.Find("CarCamera");
+        if (carController == null || carExit == null || carCamera == null)
         {
-            currentCar = car;
-            exitPosition = currentCar.transform.Find("CarExitPoint");
-            car.GetComponent<PrometeoCarController>().enabled = true;
-            car.transform.Find("CarCamera").gameObject.SetActive(true);
-            player.SetActive(false);
-            playerCamera.gameObject.SetActive(false);
-            playerInCar = true;
+            Debug.LogError("CarInteraction: Car is missing PrometeoCarController, CarExitPoint or CarCamera.", car);
+            return;
         }
+        currentCar = car;
+        exitPosition = carExit;
+        carController.enabled = true;
+        carCamera.gameObject.SetActive(true);
+        player.SetActive(false);
+        playerCamera.SetActive(false);
+        playerInCar = true;
     }
 
     void ExitCar()
     {
-        currentCar.GetComponent<PrometeoCarController>().enabled = false;
-        currentCar.transform.Find("CarCamera").gameObject.SetActive(false);
-
+        if (currentCar == null)
+        {
+            playerInCar = false;
+            return;
+        }
+        PrometeoCarController carController = currentCar.GetComponent<PrometeoCarController>();
+        Transform carCamera = currentCar.transform.Find("CarCamera");
         exitPosition = currentCar.transform.Find("CarExitPoint");
-        if (exitPosition != null)
+        if (carController != null)
+            carController.enabled = false;
+        if (carCamera != null)
+            carCamera.gameObject.SetActive(false);
+        if (player != null)
         {
-            player.transform.position = exitPosition.position;
+            player.transform.position = exitPosition != null ? exitPosition.position : currentCar.transform.position;
+            player.SetActive(true);
         }
-        else
-        {
-            Debug.Log("CarExit point is not found");
-            player.transform.position = currentCar.transform.position;
-        }
-
-        player.SetActive(true);
-        playerCamera.gameObject.SetActive(true);
+        if (playerCamera != null)
+            playerCamera.SetActive(true);
         currentCar = null;
+        exitPosition = null;
         playerInCar = false;
     }
 }

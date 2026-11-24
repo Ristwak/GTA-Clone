@@ -1,5 +1,3 @@
-using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
 
 [System.Serializable]
@@ -7,10 +5,9 @@ public class PlayerData
 {
     public int playerMoney;
     public float[] position;
-    public bool pistolPrefab; 
+    public bool pistolPrefab;
     public bool m416Prefab;
     public bool akmPrefab;
-
     public bool Mission1;
     public bool Mission2;
     public bool Mission3;
@@ -20,16 +17,16 @@ public class PlayerData
     public PlayerData(GameManager gameManager)
     {
         playerMoney = gameManager.playerMoney;
-
+        Transform playerTransform = gameManager.playerGameObject != null
+            ? gameManager.playerGameObject
+            : gameManager.transform;
         position = new float[3];
-        position[0] = gameManager.transform.position.x;
-        position[1] = gameManager.transform.position.y;
-        position[2] = gameManager.transform.position.z;
-
+        position[0] = playerTransform.position.x;
+        position[1] = playerTransform.position.y;
+        position[2] = playerTransform.position.z;
         pistolPrefab = gameManager.pistolPrefab;
         akmPrefab = gameManager.akmPrefab;
         m416Prefab = gameManager.m416Prefab;
-
         Mission1 = gameManager.Mission1;
         Mission2 = gameManager.Mission2;
         Mission3 = gameManager.Mission3;

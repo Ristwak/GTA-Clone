@@ -1,5 +1,3 @@
-using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 using UnityStandardAssets.CrossPlatformInput;
@@ -12,14 +10,13 @@ public class GameManager : MonoBehaviour
     public GameObject m416GameobjectPrefab;
     public Transform playerGameObject;
     public Transform cameraGameObject;
-
     public bool pistolPrefab;
     public bool akmPrefab;
     public bool m416Prefab;
-
     bool rifle1Active;
     bool rifle2Active;
     bool rifle3Active;
+    int currentWeapon;
 
     [Header("Player Money and Kills")]
     public int playerMoney = 150;
@@ -27,7 +24,6 @@ public class GameManager : MonoBehaviour
 
     [Header("UI Animations")]
     AnimatorManager animatorManager;
-    GameManager gameManager;
     InputManager inputManager;
     public Text playerMoneyText;
     public GameObject pistolImage;
@@ -59,262 +55,166 @@ public class GameManager : MonoBehaviour
 
     void Awake()
     {
-        if (MainMenu.instance.useMobileInput == true)
-        {
-            useMobileInputs = true;
-        }
-        else
-        {
-            useMobileInputs = false;
-        }
+        if (MainMenu.instance != null)
+            useMobileInputs = MainMenu.instance.useMobileInput;
     }
 
     void Start()
     {
-        // if(MainMenu.instance.continueGame == true)
-        // {
-        //     LoadPlayer();
-        //     cameraGameObject.position = playerGameObject.position;
-        // }
-
         animatorManager = FindObjectOfType<AnimatorManager>();
-        gameManager = FindObjectOfType<GameManager>();
         inputManager = FindObjectOfType<InputManager>();
         colliderAction = FindObjectOfType<ColliderAction>();
         carInteraction = FindObjectOfType<CarInteraction>();
-        playerMoneyText.text = "$" + playerMoney;
+        UpdateMoneyUI();
         Debug.Log("Mobile input state GameManager " + useMobileInputs);
-
     }
 
     void Update()
     {
-        // if (useMobileInputs == false)
-        // {
-        //     playerControls.SetActive(false);
-        //     shopControls.SetActive(false);
-        //     shootingControls.SetActive(false);
-        //     carControls.SetActive(false);
-        // }
+        UpdateMobileControls();
+        UpdateMoneyUI();
+        HandleWeaponInput();
+        UpdateWeaponUI();
+        UpdateMissionAreas();
+    }
 
-        if (carInteraction.playerInCar == true && colliderAction.inShop == false && rifle1Active == false && rifle2Active == false && rifle3Active == false && useMobileInputs)
-        {
-            playerControls.SetActive(false);
-            shopControls.SetActive(false);
-            shootingControls.SetActive(false);
-            carControls.SetActive(true);
-        }
-        else if (carInteraction.playerInCar == false && colliderAction.inShop == true && rifle1Active == false && rifle2Active == false && rifle3Active == false && useMobileInputs)
-        {
-            playerControls.SetActive(false);
-            shopControls.SetActive(true);
-            shootingControls.SetActive(false);
-            carControls.SetActive(false);
-        }
-        else if (carInteraction.playerInCar == false && colliderAction.inShop == false && rifle1Active == true || rifle2Active == true || rifle3Active == true && useMobileInputs)
-        {
-            playerControls.SetActive(true);
-            shopControls.SetActive(false);
-            shootingControls.SetActive(true);
-            carControls.SetActive(false);
-        }
-        else
-        {
-            playerControls.SetActive(true);
-            shopControls.SetActive(false);
-            shootingControls.SetActive(false);
-            carControls.SetActive(false);
-        }
+    void UpdateMobileControls()
+    {
+        if (!useMobileInputs)
+            return;
+        bool inCar = carInteraction != null && carInteraction.playerInCar;
+        bool inShop = colliderAction != null && colliderAction.inShop;
+        bool weaponActive = rifle1Active || rifle2Active || rifle3Active;
+        if (carControls != null)
+            carControls.SetActive(inCar);
+        if (shopControls != null)
+            shopControls.SetActive(!inCar && inShop);
+        if (shootingControls != null)
+            shootingControls.SetActive(!inCar && !inShop && weaponActive);
+        if (playerControls != null)
+            playerControls.SetActive(!inCar && !inShop);
+    }
 
-        playerMoneyText.text = "$" + playerMoney;
+    void UpdateMoneyUI()
+    {
+        if (playerMoneyText != null)
+            playerMoneyText.text = "$" + playerMoney;
+    }
 
+    void HandleWeaponInput()
+    {
+        bool changePressed = false;
         if (useMobileInputs)
+            changePressed = CrossPlatformInputManager.GetButtonDown("RifleChange");
+        else if (inputManager != null && inputManager.changeInput)
         {
-            if (CrossPlatformInputManager.GetButton("RifleChange"))
-            {
-                if (pistolPrefab == true && !rifle1Active)
-                {
-                    SetPistol();
-                    rifle1Active = true;
-                }
-                else if (akmPrefab == true && !rifle2Active)
-                {
-                    SetAKM();
-                    rifle2Active = true;
-                }
-                else if (m416Prefab == true && !rifle3Active)
-                {
-                    SetM416();
-                    rifle3Active = true;
-                }
-                else if (pistolPrefab == true && rifle1Active || akmPrefab == true && rifle2Active || m416Prefab == true && rifle3Active)
-                {
-                    rifle1Active = false;
-                    rifle2Active = false;
-                    rifle3Active = false;
-
-                    animatorManager.animator.SetBool("rifleActive", false);
-                    animatorManager.animator.SetBool("pistolActive", false);
-
-                    pistolGameobjectPrefab.SetActive(false);
-                    akmGameobjectPrefab.SetActive(false);
-                    m416GameobjectPrefab.SetActive(false);
-                }
-            }
+            changePressed = true;
+            inputManager.changeInput = false;
         }
-        else
-        {
-            if (inputManager.changeInput)
-            {
-                if (pistolPrefab == true && !rifle1Active)
-                {
-                    SetPistol();
-                    rifle1Active = true;
-                }
-                else if (akmPrefab == true && !rifle2Active)
-                {
-                    SetAKM();
-                    rifle2Active = true;
-                }
-                else if (m416Prefab == true && !rifle3Active)
-                {
-                    SetM416();
-                    rifle3Active = true;
-                }
-                else if (pistolPrefab == true && rifle1Active || akmPrefab == true && rifle2Active || m416Prefab == true && rifle3Active)
-                {
-                    rifle1Active = false;
-                    rifle2Active = false;
-                    rifle3Active = false;
-
-                    animatorManager.animator.SetBool("rifleActive", false);
-                    animatorManager.animator.SetBool("pistolActive", false);
-
-                    pistolGameobjectPrefab.SetActive(false);
-                    akmGameobjectPrefab.SetActive(false);
-                    m416GameobjectPrefab.SetActive(false);
-                }
-            }
-        }
-
-        // UI
-        if (rifle1Active == true && rifle2Active == false && rifle3Active == false)
-        {
-            pistolImage.SetActive(true);
-            akmImage.SetActive(false);
-            m416Image.SetActive(false);
-            fistImage.SetActive(false);
-        }
-        else if (rifle1Active == true && rifle2Active == true && rifle3Active == false)
-        {
-            pistolImage.SetActive(false);
-            akmImage.SetActive(true);
-            m416Image.SetActive(false);
-            fistImage.SetActive(false);
-        }
-        else if (rifle1Active == true & rifle2Active == true & rifle3Active == true)
-        {
-            pistolImage.SetActive(false);
-            akmImage.SetActive(false);
-            m416Image.SetActive(true);
-            fistImage.SetActive(false);
-        }
-        else if (rifle1Active == false || rifle2Active == false || rifle3Active == false)
-        {
-            pistolImage.SetActive(false);
-            akmImage.SetActive(false);
-            m416Image.SetActive(false);
-            fistImage.SetActive(true);
-        }
-
-        // Missions
-
-        if (Mission1 == true || Mission2 == true)
-        {
-            mission1Area.SetActive(false);
-        }
-
-        if (Mission1 == true && Mission2 == true)
-        {
-            mission3Area.SetActive(true);
-        }
-
-        if (Mission1 == true && Mission2 == true && Mission3 == true)
-        {
-            mission3CarsArea.SetActive(true);
-            mission4and5Area.SetActive(true);
-        }
-
-        if (Mission1 == true && Mission2 == true && Mission3 == true && Mission4 == true && Mission5 == true)
-        {
-            mission4and5Area.SetActive(false);
-        }
+        if (changePressed)
+            SwitchWeapon();
     }
 
-    void SetPistol()
+    void SwitchWeapon()
     {
-        if (!rifle1Active)
+        int nextWeapon = currentWeapon;
+        for (int i = 0; i < 4; i++)
         {
-            animatorManager.animator.SetBool("rifleActive", false);
-            animatorManager.animator.SetBool("pistolActive", true);
+            nextWeapon = (nextWeapon + 1) % 4;
+            if (nextWeapon == 0 || IsWeaponAvailable(nextWeapon))
+                break;
+        }
+        SetWeapon(nextWeapon);
+    }
 
-            pistolGameobjectPrefab.SetActive(true);
-            akmGameobjectPrefab.SetActive(false);
-            m416GameobjectPrefab.SetActive(false);
+    bool IsWeaponAvailable(int weapon)
+    {
+        if (weapon == 1)
+            return pistolPrefab && pistolGameobjectPrefab != null;
+        if (weapon == 2)
+            return akmPrefab && akmGameobjectPrefab != null;
+        if (weapon == 3)
+            return m416Prefab && m416GameobjectPrefab != null;
+        return weapon == 0;
+    }
+
+    void SetWeapon(int weapon)
+    {
+        SetFists();
+        currentWeapon = weapon;
+        if (weapon == 1 && IsWeaponAvailable(1))
+        {
             rifle1Active = true;
+            pistolGameobjectPrefab.SetActive(true);
+            if (animatorManager != null && animatorManager.animator != null)
+                animatorManager.animator.SetBool("pistolActive", true);
         }
-        else
+        else if (weapon == 2 && IsWeaponAvailable(2))
         {
-            animatorManager.animator.SetBool("rifleActive", false);
-            animatorManager.animator.SetBool("pistolActive", false);
-
-            pistolGameobjectPrefab.SetActive(false);
-            rifle1Active = false;
-        }
-    }
-
-    void SetAKM()
-    {
-        if (!rifle2Active)
-        {
-            animatorManager.animator.SetBool("rifleActive", true);
-            animatorManager.animator.SetBool("pistolActive", false);
-
-            pistolGameobjectPrefab.SetActive(false);
-            akmGameobjectPrefab.SetActive(true);
-            m416GameobjectPrefab.SetActive(false);
             rifle2Active = true;
+            akmGameobjectPrefab.SetActive(true);
+            if (animatorManager != null && animatorManager.animator != null)
+                animatorManager.animator.SetBool("rifleActive", true);
+        }
+        else if (weapon == 3 && IsWeaponAvailable(3))
+        {
+            rifle3Active = true;
+            m416GameobjectPrefab.SetActive(true);
+            if (animatorManager != null && animatorManager.animator != null)
+                animatorManager.animator.SetBool("rifleActive", true);
         }
         else
         {
-            animatorManager.animator.SetBool("rifleActive", false);
-            animatorManager.animator.SetBool("pistolActive", false);
-
-            akmGameobjectPrefab.SetActive(false);
-            rifle2Active = false;
+            currentWeapon = 0;
         }
+        UpdateWeaponUI();
     }
 
-    void SetM416()
+    void SetFists()
     {
-        if (!rifle3Active)
-        {
-            animatorManager.animator.SetBool("rifleActive", true);
-            animatorManager.animator.SetBool("pistolActive", false);
-
-            pistolGameobjectPrefab.SetActive(false);
-            akmGameobjectPrefab.SetActive(false);
-            m416GameobjectPrefab.SetActive(true);
-            rifle3Active = true;
-        }
-        else
+        rifle1Active = false;
+        rifle2Active = false;
+        rifle3Active = false;
+        if (animatorManager != null && animatorManager.animator != null)
         {
             animatorManager.animator.SetBool("rifleActive", false);
             animatorManager.animator.SetBool("pistolActive", false);
-
-            m416GameobjectPrefab.SetActive(false);
-            rifle3Active = false;
         }
+        if (pistolGameobjectPrefab != null)
+            pistolGameobjectPrefab.SetActive(false);
+        if (akmGameobjectPrefab != null)
+            akmGameobjectPrefab.SetActive(false);
+        if (m416GameobjectPrefab != null)
+            m416GameobjectPrefab.SetActive(false);
+    }
+
+    void UpdateWeaponUI()
+    {
+        if (pistolImage != null)
+            pistolImage.SetActive(rifle1Active);
+        if (akmImage != null)
+            akmImage.SetActive(rifle2Active);
+        if (m416Image != null)
+            m416Image.SetActive(rifle3Active);
+        if (fistImage != null)
+            fistImage.SetActive(!rifle1Active && !rifle2Active && !rifle3Active);
+    }
+
+    void UpdateMissionAreas()
+    {
+        if ((Mission1 || Mission2) && mission1Area != null)
+            mission1Area.SetActive(false);
+        if (Mission1 && Mission2 && mission3Area != null)
+            mission3Area.SetActive(true);
+        if (Mission1 && Mission2 && Mission3)
+        {
+            if (mission3CarsArea != null)
+                mission3CarsArea.SetActive(true);
+            if (mission4and5Area != null)
+                mission4and5Area.SetActive(true);
+        }
+        if (Mission1 && Mission2 && Mission3 && Mission4 && Mission5 && mission4and5Area != null)
+            mission4and5Area.SetActive(false);
     }
 
     public void SavePlayer()
@@ -325,24 +225,29 @@ public class GameManager : MonoBehaviour
     public void LoadPlayer()
     {
         PlayerData data = SaveSystem.LoadPlayer();
-
+        if (data == null)
+            return;
+        if (data.position == null || data.position.Length < 3)
+        {
+            Debug.LogError("GameManager: Saved player position is invalid.");
+            return;
+        }
         playerMoney = data.playerMoney;
-
-        Vector3 position;
-        position.x = data.position[0];
-        position.y = data.position[1];
-        position.z = data.position[2];
-
-        playerGameObject.position = position;
-
+        Vector3 position = new Vector3(data.position[0], data.position[1], data.position[2]);
+        if (playerGameObject != null)
+            playerGameObject.position = position;
+        else
+            Debug.LogWarning("GameManager: Player GameObject reference is missing.");
         pistolPrefab = data.pistolPrefab;
         akmPrefab = data.akmPrefab;
         m416Prefab = data.m416Prefab;
-
         Mission1 = data.Mission1;
         Mission2 = data.Mission2;
         Mission3 = data.Mission3;
         Mission4 = data.Mission4;
         Mission5 = data.Mission5;
+        SetWeapon(0);
+        UpdateMissionAreas();
+        UpdateMoneyUI();
     }
 }
