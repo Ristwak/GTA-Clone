@@ -262,6 +262,16 @@ Consequently:
 
 The changes described as addressed refer to code-level corrections and proposed replacements, not independently verified runtime results.
 
+## Repository Scope and Asset Exclusion
+
+The GitHub repository is intended to contain the core gameplay code, scripts, project configuration and supporting technical files rather than the complete game asset collection.
+
+To keep repository size manageable, large Unity assets and resource files, such as 3D models, textures, animations, audio, environments and other heavy project resources, are not included in the shared repository.
+
+The repository primarily focuses on the game's core programming logic and technical implementation.
+
+**Important:** The complete Unity project requires the corresponding assets and resources to be available separately. The repository alone should not be considered a fully self-contained, ready-to-run Unity project.
+
 ## 7. Final Assessment
 
 The project received a focused code-level review across its core gameplay systems. Several important issues involving input handling, weapon selection, AI conditions, navigation, interaction handling, repeated rewards and save-position handling were identified and addressed in the reviewed replacements.
