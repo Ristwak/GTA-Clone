@@ -1,5 +1,3 @@
-using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -24,41 +22,21 @@ public class WantedLevel : MonoBehaviour
 
     void Start()
     {
-        gameManager = GetComponent<GameManager>();
+        gameManager = FindObjectOfType<GameManager>();
+        if (gameManager == null)
+            Debug.LogError("WantedLevel: GameManager not found.", this);
     }
 
     void Update()
     {
-        if (gameManager.currentKills == 1)
-        {
-            SetStarColor(level1Star, true);
-            Level1 = true;
-        }
-
-        if (gameManager.currentKills == 3)
-        {
-            SetStarColor(level2Star, true);
-            Level2 = true;
-        }
-
-        if (gameManager.currentKills == 5)
-        {
-            SetStarColor(level3Star, true);
-            Level3 = true;
-        }
-
-        if (gameManager.currentKills == 10)
-        {
-            SetStarColor(level4Star, true);
-            Level4 = true;
-        }
-
-        if (gameManager.currentKills == 15)
-        {
-            SetStarColor(level5Star, true);
-            Level5 = true;
-        }
-        
+        if (gameManager == null)
+            return;
+        int kills = gameManager.currentKills;
+        Level1 = kills >= 1;
+        Level2 = kills >= 3;
+        Level3 = kills >= 5;
+        Level4 = kills >= 10;
+        Level5 = kills >= 15;
         SetStarColor(level1Star, Level1);
         SetStarColor(level2Star, Level2);
         SetStarColor(level3Star, Level3);
@@ -68,6 +46,8 @@ public class WantedLevel : MonoBehaviour
 
     void SetStarColor(Image star, bool isVisible)
     {
+        if (star == null)
+            return;
         Color color = star.color;
         color.a = isVisible ? 1f : alphaValue;
         star.color = color;

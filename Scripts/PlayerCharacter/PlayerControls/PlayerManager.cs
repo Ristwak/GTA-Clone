@@ -1,5 +1,3 @@
-using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
 
 public class PlayerManager : MonoBehaviour
@@ -21,17 +19,24 @@ public class PlayerManager : MonoBehaviour
 
     void Update()
     {
-        inputManager.HandleAllInputs();
-        cameraManager.HandleAllCameraMovement();
+        if (inputManager != null)
+            inputManager.HandleAllInputs();
+
+        if (cameraManager != null)
+            cameraManager.HandleAllCameraMovement();
     }
 
     void FixedUpdate()
     {
-        playerMovement.HandleAllMovement();
+        if (playerMovement != null)
+            playerMovement.HandleAllMovement();
     }
 
     void LateUpdate()
     {
+        if (animator == null || playerMovement == null)
+            return;
+
         isInteracting = animator.GetBool("isInteracting");
         playerMovement.isJumping = animator.GetBool("isJumping");
         animator.SetBool("isGrounded", playerMovement.isGrounded);

@@ -1,5 +1,3 @@
-using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
 
 public class Guard : MonoBehaviour
@@ -11,12 +9,10 @@ public class Guard : MonoBehaviour
     public float turningSpeed = 300f;
     public float stopSpeed = 1f;
     bool isDead = false;
-
     [Header("Character Health")]
     float characterHealth = 100f;
     public float presentHealth;
     Animator animator;
-
     [Header("Guard AI")]
     GameObject playerBody;
     public LayerMask playerLayer;
@@ -24,7 +20,6 @@ public class Guard : MonoBehaviour
     public float shootingRadius;
     public bool playerInVisionRadius;
     public bool playerInShootingRadius;
-
     [Header("Guard Shooting Variables")]
     public float giveDamageOf = 3f;
     public float shootingRange = 100f;
@@ -32,7 +27,6 @@ public class Guard : MonoBehaviour
     public float timeBtwShoot;
     bool previouslyShoot;
     public GameObject bloodEffect;
-
     [Header("Script Refs")]
     GameManager gameManager;
 
@@ -47,74 +41,85 @@ public class Guard : MonoBehaviour
 
     void Update()
     {
-        if (isDead == true)
+        if (isDead)
             return;
-
+        if (playerBody == null)
+            playerBody = GameObject.Find("Player");
+        if (playerBody == null)
+        {
+            Idle();
+            return;
+        }
         playerInVisionRadius = Physics.CheckSphere(transform.position, visionRadius, playerLayer);
         playerInShootingRadius = Physics.CheckSphere(transform.position, shootingRadius, playerLayer);
-
-        if (!playerInVisionRadius && !playerInShootingRadius)
+        if (!playerInVisionRadius)
         {
             Idle();
         }
-
-        if (playerInVisionRadius && !playerInShootingRadius)
-        {
-            ChasePlayer();
-        }
-
-        if (playerInVisionRadius && playerInShootingRadius)
+        else if (playerInShootingRadius)
         {
             ShootPlayer();
+        }
+        else
+        {
+            ChasePlayer();
         }
     }
 
     public void Idle()
     {
         currentMovingSpeed = 0f;
-        animator.SetBool("Run", false);
-        animator.SetBool("Shoot", false);
+        if (animator != null)
+        {
+            animator.SetBool("Run", false);
+            animator.SetBool("Shoot", false);
+        }
     }
 
     public void ChasePlayer()
     {
-        transform.position += transform.forward * currentMovingSpeed * Time.deltaTime;
-        transform.LookAt(playerBody.transform);
-
-        animator.SetBool("Run", true);
-        animator.SetBool("Shooting", false);
-
+        if (playerBody == null)
+            return;
         currentMovingSpeed = runningSpeed;
+        transform.LookAt(playerBody.transform);
+        transform.position += transform.forward * currentMovingSpeed * Time.deltaTime;
+        if (animator != null)
+        {
+            animator.SetBool("Run", true);
+            animator.SetBool("Shooting", false);
+        }
     }
 
     void ShootPlayer()
     {
+        if (playerBody == null)
+            return;
         currentMovingSpeed = 0f;
         transform.LookAt(playerBody.transform);
-
-        animator.SetBool("Run", false);
-        animator.SetBool("Shoot", true);
-
-        if (!previouslyShoot)
+        if (animator != null)
         {
-            RaycastHit hit;
-            if (Physics.Raycast(shootingRaycastArea.transform.position, shootingRaycastArea.transform.forward, out hit, shootingRange))
+            animator.SetBool("Run", false);
+            animator.SetBool("Shoot", true);
+        }
+        if (previouslyShoot || shootingRaycastArea == null)
+            return;
+        RaycastHit hit;
+        if (Physics.Raycast(shootingRaycastArea.transform.position, shootingRaycastArea.transform.forward, out hit, shootingRange))
+        {
+            Debug.Log("Guard is shooting at " + hit.transform.name);
+            PlayerMovement playerScript = hit.transform.GetComponentInParent<PlayerMovement>();
+            if (playerScript != null)
             {
-                Debug.Log("Guard is shooting at " + hit.transform.name);
-
-                PlayerMovement playerScript = hit.transform.GetComponent<PlayerMovement>();
-
-                if (playerScript != null)
+                playerScript.CharacterHitDamage(giveDamageOf);
+                if (bloodEffect != null)
                 {
-                    playerScript.CharacterHitDamage(giveDamageOf);
                     GameObject bloodEffectGo = Instantiate(bloodEffect, hit.point, Quaternion.LookRotation(hit.normal));
                     Destroy(bloodEffectGo, 1f);
                 }
             }
-
-            previouslyShoot = true;
-            Invoke(nameof(ActiveShooting), timeBtwShoot);
         }
+        previouslyShoot = true;
+        Invoke(nameof(ActiveShooting), timeBtwShoot);
     }
 
     void ActiveShooting()
@@ -124,25 +129,33 @@ public class Guard : MonoBehaviour
 
     public void CharacterHitDamage(float takeDamage)
     {
-        presentHealth -= takeDamage;
-
-        if (presentHealth <= 0)
+        if (isDead || takeDamage <= 0f)
+            return;
+        presentHealth = Mathf.Max(0f, presentHealth - takeDamage);
+        if (presentHealth <= 0f)
         {
-            animator.SetBool("Die", true);
-            // kill character
+            if (animator != null)
+                animator.SetBool("Die", true);
             CharacterDie();
-            // increase player kills and player money
-            gameManager.currentKills += 1;
-            gameManager.playerMoney += 30;
+            if (gameManager != null)
+            {
+                gameManager.currentKills += 1;
+                gameManager.playerMoney += 30;
+            }
         }
     }
 
     void CharacterDie()
     {
+        if (isDead)
+            return;
         isDead = true;
         shootingRadius = 0f;
         currentMovingSpeed = 0f;
-        gameObject.GetComponent<CapsuleCollider>().enabled = false;
-        Object.Destroy(gameObject, 4f);
+        CapsuleCollider guardCollider = GetComponent<CapsuleCollider>();
+        if (guardCollider != null)
+            guardCollider.enabled = false;
+        CancelInvoke(nameof(ActiveShooting));
+        Destroy(gameObject, 4f);
     }
 }

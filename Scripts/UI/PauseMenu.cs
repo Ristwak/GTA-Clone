@@ -1,5 +1,4 @@
 using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityStandardAssets.CrossPlatformInput;
@@ -23,40 +22,27 @@ public class PauseMenu : MonoBehaviour
 
     void Update()
     {
-        if (gameManager.useMobileInputs == true)
-        {
-            if (CrossPlatformInputManager.GetButtonDown("Pause"))
-            {
-                if (isPaused)
-                {
-                    Resume();
-                }
-                else
-                {
-                    Pause();
-                }
-            }
-        }
+        if (gameManager == null)
+            return;
+        bool pausePressed = gameManager.useMobileInputs
+            ? CrossPlatformInputManager.GetButtonDown("Pause")
+            : inputManager != null && inputManager.pauseInput;
+        if (!pausePressed)
+            return;
+        if (inputManager != null)
+            inputManager.pauseInput = false;
+        if (isPaused)
+            Resume();
         else
-        {
-            if (inputManager.pauseInput)
-            {
-                if (isPaused)
-                {
-                    Resume();
-                }
-                else
-                {
-                    Pause();
-                }
-            }
-        }
+            Pause();
     }
 
     public void Resume()
     {
-        pauseMenuUI.SetActive(false);
-        otherUI.SetActive(true);
+        if (pauseMenuUI != null)
+            pauseMenuUI.SetActive(false);
+        if (otherUI != null)
+            otherUI.SetActive(true);
         Time.timeScale = 1f;
         isPaused = false;
         Cursor.lockState = CursorLockMode.Locked;
@@ -65,8 +51,10 @@ public class PauseMenu : MonoBehaviour
 
     public void Pause()
     {
-        pauseMenuUI.SetActive(true);
-        otherUI.SetActive(false);
+        if (pauseMenuUI != null)
+            pauseMenuUI.SetActive(true);
+        if (otherUI != null)
+            otherUI.SetActive(false);
         Time.timeScale = 0f;
         isPaused = true;
         Cursor.lockState = CursorLockMode.None;
@@ -86,43 +74,35 @@ public class PauseMenu : MonoBehaviour
     public void onOptionButton()
     {
         Debug.Log("Option");
-        pauseMenuUI.SetActive(false);
-        optionsMenuUI.SetActive(true);
+        if (pauseMenuUI != null)
+            pauseMenuUI.SetActive(false);
+        if (optionsMenuUI != null)
+            optionsMenuUI.SetActive(true);
     }
 
     private IEnumerator LoadSceneAsync(string sceneName)
     {
-        // Show loading UI immediately
-        if (mainMenu != null)
-        {
+        if (mainMenu != null && mainMenu.LoadingMenuUI != null)
             mainMenu.LoadingMenuUI.SetActive(true);
-        }
-        pauseMenuUI.SetActive(false);
-        otherUI.SetActive(false);
-
-        // Force UI update
+        if (pauseMenuUI != null)
+            pauseMenuUI.SetActive(false);
+        if (otherUI != null)
+            otherUI.SetActive(false);
         yield return null;
-
-        // Start loading the scene
         AsyncOperation asyncLoad = SceneManager.LoadSceneAsync(sceneName);
-
-        // Wait until the asynchronous scene fully loads
-        while (!asyncLoad.isDone)
+        if (asyncLoad == null)
         {
-            yield return null;
+            Time.timeScale = 1f;
+            yield break;
         }
-
-        // Ensure time scale is reset
+        while (!asyncLoad.isDone)
+            yield return null;
         Time.timeScale = 1f;
-
-        // Re-initialize game states
         InitializeGameStates();
     }
 
     private void InitializeGameStates()
     {
-        // Re-initialize your game states here
-        // For example, you can reset static variables, re-enable game objects, etc.
         isPaused = false;
         Cursor.lockState = CursorLockMode.Locked;
         Cursor.visible = false;

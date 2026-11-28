@@ -1,5 +1,4 @@
 using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
 using UnityStandardAssets.CrossPlatformInput;
 
@@ -7,7 +6,6 @@ public class ShootingController : MonoBehaviour
 {
     InputManager inputManager;
     GameManager gameManager;
-
     public Transform firePoint;
     public float fireRate = 0.5f;
     public float reloadTime = 2f;
@@ -15,7 +13,6 @@ public class ShootingController : MonoBehaviour
     public int maxAmmo = 300;
     public float fireRange = 100f;
     public float giveDamageOf = 5f;
-
     private float nextFireTime;
     private int currentMagazine;
     private int currentAmmo;
@@ -36,129 +33,109 @@ public class ShootingController : MonoBehaviour
 
     void Update()
     {
-        if (gameManager.useMobileInputs == true)
+        if (gameManager == null)
+            return;
+        if (gameManager.useMobileInputs)
         {
             if (CrossPlatformInputManager.GetButton("Fire") && Time.time >= nextFireTime && currentMagazine > 0 && !isReloading)
             {
                 Shoot();
-                nextFireTime = Time.time + 1 / fireRate;
+                nextFireTime = Time.time + 1f / Mathf.Max(fireRate, 0.01f);
             }
-
             if (CrossPlatformInputManager.GetButton("Reload") && currentMagazine < magazineCapacity && currentAmmo > 0 && !isReloading)
-            {
                 StartCoroutine(Reload());
-            }
         }
-        else
+        else if (inputManager != null)
         {
             if (inputManager.shootInput && Time.time >= nextFireTime && currentMagazine > 0 && !isReloading)
             {
                 Shoot();
-                nextFireTime = Time.time + 1 / fireRate;
+                nextFireTime = Time.time + 1f / Mathf.Max(fireRate, 0.01f);
             }
-
             if (inputManager.reloadInput && currentMagazine < magazineCapacity && currentAmmo > 0 && !isReloading)
-            {
                 StartCoroutine(Reload());
-            }
         }
     }
 
     void Shoot()
     {
-        muzzleFlash.Play();
-        RaycastHit hit;
-        if (Physics.Raycast(firePoint.position, firePoint.forward, out hit, fireRange))
+        if (firePoint == null)
+            return;
+        if (muzzleFlash != null)
+            muzzleFlash.Play();
+        if (Physics.Raycast(firePoint.position, firePoint.forward, out RaycastHit hit, fireRange))
         {
-            // perform action on the object hit
             Debug.Log("Hit: " + hit.transform.name);
-
-            CharacterNavigatorScript characterNavigatorScript = hit.transform.GetComponent<CharacterNavigatorScript>();
+            bool hitCharacter = false;
+            CharacterNavigatorScript characterNavigatorScript = hit.transform.GetComponentInParent<CharacterNavigatorScript>();
+            PoliceOfficer policeOfficer = hit.transform.GetComponentInParent<PoliceOfficer>();
+            PoliceOfficer2 policeOfficer2 = hit.transform.GetComponentInParent<PoliceOfficer2>();
+            Character character = hit.transform.GetComponentInParent<Character>();
+            Guard guard = hit.transform.GetComponentInParent<Guard>();
+            Diaz diaz = hit.transform.GetComponentInParent<Diaz>();
+            Lance lance = hit.transform.GetComponentInParent<Lance>();
 
             if (characterNavigatorScript != null)
             {
                 characterNavigatorScript.CharacterHitDamage(giveDamageOf);
-                GameObject bloodEffectGo = Instantiate(bloodEffect, hit.point, Quaternion.LookRotation(hit.normal));
-                Destroy(bloodEffectGo, 1f);
+                hitCharacter = true;
             }
-
-            PoliceOfficer policeOfficer = hit.transform.GetComponent<PoliceOfficer>();
-
-            if (policeOfficer != null)
+            else if (policeOfficer != null)
             {
                 policeOfficer.CharacterHitDamage(giveDamageOf);
-                GameObject bloodEffectGo = Instantiate(bloodEffect, hit.point, Quaternion.LookRotation(hit.normal));
-                Destroy(bloodEffectGo, 1f);
+                hitCharacter = true;
             }
-
-            PoliceOfficer2 policeOfficer2 = hit.transform.GetComponent<PoliceOfficer2>();
-
-            if (policeOfficer2 != null)
+            else if (policeOfficer2 != null)
             {
                 policeOfficer2.CharacterHitDamage(giveDamageOf);
-                GameObject bloodEffectGo = Instantiate(bloodEffect, hit.point, Quaternion.LookRotation(hit.normal));
-                Destroy(bloodEffectGo, 1f);
+                hitCharacter = true;
             }
-
-            Character character = hit.transform.GetComponent<Character>();
-
-            if (character != null)
+            else if (character != null)
             {
                 character.CharacterHitDamage(giveDamageOf);
-                GameObject bloodEffectGo = Instantiate(bloodEffect, hit.point, Quaternion.LookRotation(hit.normal));
-                Destroy(bloodEffectGo, 1f);
+                hitCharacter = true;
             }
-
-            Guard guard = hit.transform.GetComponent<Guard>();
-
-            if (guard != null)
+            else if (guard != null)
             {
                 guard.CharacterHitDamage(giveDamageOf);
-                GameObject bloodEffectGo = Instantiate(bloodEffect, hit.point, Quaternion.LookRotation(hit.normal));
-                Destroy(bloodEffectGo, 1f);
+                hitCharacter = true;
             }
-
-            Diaz diaz = hit.transform.GetComponent<Diaz>();
-
-            if (diaz != null)
+            else if (diaz != null)
             {
                 diaz.CharacterHitDamage(giveDamageOf);
-                GameObject bloodEffectGo = Instantiate(bloodEffect, hit.point, Quaternion.LookRotation(hit.normal));
-                Destroy(bloodEffectGo, 1f);
+                hitCharacter = true;
             }
-
-            Lance lance = hit.transform.GetComponent<Lance>();
-
-            if (lance != null)
+            else if (lance != null)
             {
                 lance.CharacterHitDamage(giveDamageOf);
-                GameObject bloodEffectGo = Instantiate(bloodEffect, hit.point, Quaternion.LookRotation(hit.normal));
-                Destroy(bloodEffectGo, 1f);
+                hitCharacter = true;
             }
 
-            if (characterNavigatorScript == null && policeOfficer == null && policeOfficer2 == null && character == null && guard == null && diaz == null && lance == null)
-            {
-                GameObject justEffectGo = Instantiate(justEffect, hit.point, Quaternion.LookRotation(hit.normal));
-                Destroy(justEffectGo, 1f);
-            }
+            if (hitCharacter)
+                SpawnEffect(bloodEffect, hit.point, hit.normal);
+            else
+                SpawnEffect(justEffect, hit.point, hit.normal);
         }
         currentMagazine--;
+    }
+
+    void SpawnEffect(GameObject effectPrefab, Vector3 position, Vector3 normal)
+    {
+        if (effectPrefab == null)
+            return;
+        GameObject effect = Instantiate(effectPrefab, position, Quaternion.LookRotation(normal));
+        Destroy(effect, 1f);
     }
 
     IEnumerator Reload()
     {
         isReloading = true;
-
         int ammoToReload = Mathf.Min(magazineCapacity - currentMagazine, currentAmmo);
         yield return new WaitForSeconds(reloadTime);
         currentMagazine += ammoToReload;
         currentAmmo -= ammoToReload;
-
         if (currentAmmo < maxAmmo - magazineCapacity)
-        {
             maxAmmo = currentAmmo + magazineCapacity;
-        }
-
         isReloading = false;
     }
 }

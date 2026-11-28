@@ -1,5 +1,3 @@
-using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -16,85 +14,86 @@ public class Mission3 : MonoBehaviour
     public GameObject mainCamera;
     public GameObject missionCamera;
     public float targetTime = 10f;
+    PlayerMovement playerMovement;
+    float originalWalkingSpeed;
+    float originalRunningSpeed;
+    float originalSprintingSpeed;
+    bool movementSpeedsCached;
 
     void Start()
     {
-        if (textArray.Length > 0)
+        if (playerCharacter != null)
         {
-            subtitleText.text = textArray[0];
+            playerMovement = playerCharacter.GetComponent<PlayerMovement>();
+            if (playerMovement != null)
+            {
+                originalWalkingSpeed = playerMovement.walkingSpeed;
+                originalRunningSpeed = playerMovement.runningSpeed;
+                originalSprintingSpeed = playerMovement.sprintingSpeed;
+                movementSpeedsCached = true;
+            }
         }
+        if (textArray != null && textArray.Length > 0 && subtitleText != null)
+            subtitleText.text = textArray[0];
     }
 
     void Update()
     {
+        if (subtitleText != null)
+            subtitleText.gameObject.SetActive(isCollided);
         if (!isCollided)
+            return;
+        if (playerMovement != null)
         {
-            subtitleText.gameObject.SetActive(false);
+            playerMovement.walkingSpeed = 0f;
+            playerMovement.runningSpeed = 0f;
+            playerMovement.sprintingSpeed = 0f;
         }
-        else
-        {
-            subtitleText.gameObject.SetActive(true);
-        }
-
-        if (isCollided)
-        {
-            if (playerCharacter != null)
-            {
-                PlayerMovement playerMovement = playerCharacter.GetComponent<PlayerMovement>();
-                if (playerMovement != null)
-                {
-                    playerMovement.walkingSpeed = 0f;
-                    playerMovement.runningSpeed = 0f;
-                    playerMovement.sprintingSpeed = 0f;
-                }
-            }
-
+        if (mainCamera != null)
             mainCamera.SetActive(false);
+        if (missionCamera != null)
             missionCamera.SetActive(true);
-
+        if (characterAnimator != null)
             characterAnimator.SetBool("StartTalking", true);
+        if (cameraAnimator != null)
             cameraAnimator.SetBool("StartMoving", true);
-
+        if (textArray != null && textArray.Length > 0)
+        {
             timer += Time.deltaTime;
-
             if (timer >= 10f)
             {
                 timer = 0f;
                 currentIndex = (currentIndex + 1) % textArray.Length;
-                subtitleText.text = textArray[currentIndex];
+                if (subtitleText != null)
+                    subtitleText.text = textArray[currentIndex];
             }
-            targetTime -= Time.deltaTime;
         }
+        targetTime -= Time.deltaTime;
+        if (targetTime <= 0f)
+            CompleteMission();
+    }
 
-        if (targetTime <= 0f && isCollided == true)
-        {
-            isCollided = false;
-
+    void CompleteMission()
+    {
+        isCollided = false;
+        if (subtitleText != null)
             subtitleText.text = "";
-
-            Destroy(gameObject);
-
-            if (playerCharacter != null)
-            {
-                PlayerMovement playerMovement = playerCharacter.GetComponent<PlayerMovement>();
-                if (playerMovement != null)
-                {
-                    playerMovement.walkingSpeed = 1.5f;
-                    playerMovement.runningSpeed = 5f;
-                    playerMovement.sprintingSpeed = 7f;
-                }
-            }
-
-            mainCamera.SetActive(true);
-            missionCamera.SetActive(false);
+        Destroy(gameObject);
+        if (playerMovement != null && movementSpeedsCached)
+        {
+            playerMovement.walkingSpeed = originalWalkingSpeed;
+            playerMovement.runningSpeed = originalRunningSpeed;
+            playerMovement.sprintingSpeed = originalSprintingSpeed;
         }
+        if (mainCamera != null)
+            mainCamera.SetActive(true);
+        if (missionCamera != null)
+            missionCamera.SetActive(false);
     }
 
     private void OnTriggerEnter(Collider other)
     {
         if (other.CompareTag("Player"))
-        {
             isCollided = true;
-        }
     }
 }
